@@ -1,0 +1,28 @@
+# 统一换行符，避免在 Windows 上提交时把 LF 转成 CRLF。
+#
+# 关键原因：CI 在 Linux 上跑 `./gradlew`。如果 gradlew 被存成 CRLF，
+# shell 会报 “bad interpreter: /bin/sh^M”，GitHub Actions 直接失败。
+
+# 默认：按文本处理，仓库内与检出都用 LF
+* text=auto eol=lf
+
+# Windows 批处理必须是 CRLF，否则 cmd 解析可能出问题
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制，别做任何换行转换
+*.jar   binary
+*.png   binary
+*.jpg   binary
+*.gif   binary
+*.ico   binary
+*.zip   binary
+*.7z    binary
+
+# Gradle wrapper 脚本必须保持 LF
+gradlew   text eol=lf
+*.sh      text eol=lf
+
+# ForgeGradle 生成的缓存，本来就是 LF
+src/generated/**/.cache/cache text eol=lf
+src/generated/**/*.json text eol=lf

@@ -1,0 +1,16 @@
+{
+  "item.teleport_staff.teleport_staff": "Teleport Staff",
+
+  "tooltip.teleport_staff.usage": "Hold the staff in your main hand and warp dust in your off hand, then right-click",
+  "tooltip.teleport_staff.distance": "1 warp dust = %d blocks",
+  "tooltip.teleport_staff.stack": "The whole offhand stack is consumed - more dust, more distance",
+  "tooltip.teleport_staff.cardinal": "Snaps to north/south/east/west - never diagonal",
+
+  "message.teleport_staff.need_dust": "You need warp dust in your off hand",
+  "message.teleport_staff.teleported": "Teleported %2$s blocks %1$s",
+
+  "direction.teleport_staff.north": "north",
+  "direction.teleport_staff.south": "south",
+  "direction.teleport_staff.east": "east",
+  "direction.teleport_staff.west": "west"
+}

@@ -1,0 +1,34 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+authors="${mod_authors}"
+description='''${mod_description}'''
+
+# 传送石碑是<b>硬依赖</b>：传送法杖的燃料就是它提供的「传送粉」(waystones:warp_dust)。
+# 没装它的话法杖永远无法使用，与其让玩家进游戏后对着一个没反应的物品发愁，
+# 不如在加载阶段就明确报错。
+[[dependencies.${mod_id}]]
+    modId="forge"
+    mandatory=true
+    versionRange="${forge_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="waystones"
+    mandatory=true
+    versionRange="[14,)"
+    ordering="AFTER"
+    side="BOTH"

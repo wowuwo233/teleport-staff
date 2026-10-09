@@ -1,0 +1,28 @@
+pluginManagement {
+    repositories {
+        // NOTE: The Gradle Plugin Portal (plugins.gradle.org) is DNS-hijacked on this
+        // network ("No name matching plugins.gradle.org found"), so it is deliberately
+        // NOT listed here. ForgeGradle publishes its own plugin marker on the Forge
+        // maven, which is enough for this build.
+        maven {
+            name = 'MinecraftForge'
+            url = 'https://maven.minecraftforge.net/'
+        }
+        // Fallbacks, used only if a plugin marker is missing from the Forge maven.
+        maven {
+            name = 'AliyunGradlePlugin'
+            url = 'https://maven.aliyun.com/repository/gradle-plugin/'
+        }
+        maven {
+            name = 'AliyunPublic'
+            url = 'https://maven.aliyun.com/repository/public/'
+        }
+    }
+}
+
+// NOTE: the 'org.gradle.toolchains.foojay-resolver-convention' plugin from the stock MDK
+// has been removed on purpose -- it exists only to auto-download JDKs, it lives on the
+// unreachable plugin portal, and JDK 17 is already installed locally.
+// Gradle auto-detects C:\Program Files\Java\jdk-17 for the Java 17 toolchain below.
+
+rootProject.name = 'teleport-staff'

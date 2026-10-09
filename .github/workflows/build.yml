@@ -1,0 +1,56 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # 刻意不用 ./gradlew：仓库里的 gradle-wrapper.properties 指向腾讯镜像
+      # （仓库作者所在网络访问 services.gradle.org 会超时），在 GitHub 的机器上
+      # 未必稳定。这里直接让 Action 装一份官方 Gradle 8.8，绕开 wrapper。
+      # 本地开发仍然照常用 ./gradlew。
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.8'
+
+      # libs/ 里放的 Waystones 与 Balm 是第三方 mod，不进仓库（见 .gitignore）。
+      # 但它们是 runtimeOnly、且 build.gradle 对空 libs/ 做了判断，
+      # 所以这里不补任何东西，编译照样能过——只是 CI 产物没法直接进游戏跑
+      # （缺传送石碑就没有传送粉）。这正是我们要的行为：
+      # CI 验证的是「代码能不能编译」，不是「能不能玩」。
+      - name: Build
+        run: gradle build --no-daemon --stacktrace
+
+      # 脱机回归测试：不依赖 Minecraft，直接 javac + java 就能跑。
+      # 覆盖方位吸附、无侧向偏移的逐位保证，以及一批源码层面的行为约束。
+      - name: Offline checks
+        run: |
+          mkdir -p build/tools-check
+          javac -encoding UTF-8 -d build/tools-check -sourcepath src/main/java tools/Check.java
+          java -Dfile.encoding=UTF-8 -cp build/tools-check com.wowuwo233.teleport_staff.Check
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: teleport_staff-jar
+          path: build/libs/*.jar
+          if-no-files-found: error

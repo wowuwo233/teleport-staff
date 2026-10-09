@@ -1,0 +1,40 @@
+# eclipse
+bin
+*.launch
+.settings
+.metadata
+.classpath
+.project
+
+# idea
+out
+*.ipr
+*.iws
+*.iml
+.idea
+
+# gradle
+build
+.gradle
+
+# other
+eclipse
+.eclipse
+run
+run-data
+mcmodsrepo
+
+# logs from dev runs
+run*/logs/
+run*/crash-reports/
+*.log
+
+# Files from Forge MDK
+forge*changelog.txt
+
+# libs/ holds third-party mod jars (Waystones, Balm) that are needed only to
+# *run* the dev client/server. They must never be committed: redistributing
+# someone else's mod from this repository is not ours to do, and the build is
+# designed to work without them (see the "libs/ is optional" note in build.gradle).
+libs/
+
