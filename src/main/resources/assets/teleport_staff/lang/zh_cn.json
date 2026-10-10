@@ -1,12 +1,17 @@
 {
   "item.teleport_staff.teleport_staff": "传送法杖",
+  "item.teleport_staff.compressed_warp_dust": "压缩传送粉",
 
-  "tooltip.teleport_staff.usage": "主手拿法杖，副手拿传送粉，右键朝面朝的方向传送",
-  "tooltip.teleport_staff.distance": "1 个传送粉 = %d 格",
-  "tooltip.teleport_staff.stack": "副手的传送粉会被整叠消耗，有多少传多远",
+  "tooltip.teleport_staff.usage": "主手拿法杖，副手拿传送粉或压缩传送粉，右键朝面朝的方向传送",
+  "tooltip.teleport_staff.distance": "传送粉：1 个 = %d 格",
+  "tooltip.teleport_staff.distance_compressed": "压缩传送粉：1 个 = %d 格",
+  "tooltip.teleport_staff.stack": "副手的燃料会被整叠消耗，有多少传多远",
   "tooltip.teleport_staff.cardinal": "方向会吸附到东南西北，不会斜着传",
 
-  "message.teleport_staff.need_dust": "副手需要拿着传送粉",
+  "tooltip.teleport_staff.compressed_dust": "1 个可传送 %d 格",
+  "tooltip.teleport_staff.compressed_use": "放进副手，配合传送法杖使用",
+
+  "message.teleport_staff.need_dust": "副手需要拿着传送粉或压缩传送粉",
   "message.teleport_staff.teleported": "已向%1$s传送 %2$s 格",
 
   "direction.teleport_staff.north": "北",

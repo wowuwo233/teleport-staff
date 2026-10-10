@@ -3,8 +3,8 @@ package com.wowuwo233.teleport_staff.item;
 import com.wowuwo233.teleport_staff.Config;
 import com.wowuwo233.teleport_staff.teleport.CardinalDirection;
 import com.wowuwo233.teleport_staff.teleport.Invulnerability;
+import com.wowuwo233.teleport_staff.teleport.TeleportFuel;
 import com.wowuwo233.teleport_staff.teleport.TeleportTarget;
-import com.wowuwo233.teleport_staff.teleport.WarpDust;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
@@ -17,7 +17,8 @@ import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
@@ -27,7 +28,8 @@ import java.util.List;
 /**
  * 传送法杖。
  *
- * <p>用法：<b>主手</b>拿法杖、<b>副手</b>拿传送粉，右键朝你面朝的基本方位传送。
+ * <p>用法：<b>主手</b>拿法杖、<b>副手</b>拿燃料（传送粉或压缩传送粉），
+ * 右键朝你面朝的基本方位传送。
  *
  * <h2>三条规则</h2>
  * <ol>
@@ -65,7 +67,7 @@ public class TeleportStaffItem extends Item {
         }
 
         ItemStack offhand = player.getOffhandItem();
-        if (!WarpDust.isWarpDust(offhand)) {
+        if (!TeleportFuel.isFuel(offhand)) {
             if (level.isClientSide) {
                 warn(player, "message.teleport_staff.need_dust");
             }
@@ -81,9 +83,14 @@ public class TeleportStaffItem extends Item {
 
     private InteractionResultHolder<ItemStack> serverUse(ServerPlayer player, ServerLevel level,
                                                          ItemStack staff, ItemStack offhand) {
-        // 距离由副手数量决定，然后整叠消耗。
-        int dustCount = offhand.getCount();
-        int distance = dustCount * Config.BLOCKS_PER_DUST.get();
+        // 距离 = 副手数量 × 该种燃料的单价值。副手只有一个格子，
+        // 所以两种粉不会混装，不需要加权。
+        int fuelCount = offhand.getCount();
+        int distance = TeleportFuel.totalDistance(offhand);
+
+        // 补货要用同一种燃料的模板：副手放的是压缩粉，就不能补成普通粉，
+        // 否则下一次右键的距离会突然变成十分之一。
+        Item template = TeleportFuel.templateOf(offhand);
 
         Vec3 look = player.getViewVector(1.0F);
         CardinalDirection direction = CardinalDirection.nearest(look.x, look.z);
@@ -100,7 +107,7 @@ public class TeleportStaffItem extends Item {
             offhand.setCount(0); // 整叠消耗
             // 消耗之后再补货，否则会把刚补进来的粉又清掉。
             if (Config.REFILL_OFFHAND.get()) {
-                refillOffhand(player, dustCount);
+                refillOffhand(player, template, fuelCount);
             }
         }
 
@@ -123,7 +130,7 @@ public class TeleportStaffItem extends Item {
     }
 
     /**
-     * 把背包里的传送粉移到副手，补回到 {@code want} 个（也就是刚刚消耗掉的数量）。
+     * 把背包里的燃料移到副手，补回到 {@code want} 个（也就是刚刚消耗掉的数量）。
      *
      * <p>为什么需要它：副手整叠会被一次扣光，没有这个补货，玩家每传一次都得
      * 手动从背包拖一叠粉到副手——带 64 个粉连续赶路时要拖 64 次，没人受得了。
@@ -132,11 +139,14 @@ public class TeleportStaffItem extends Item {
      * 说明他想一次走 500 格；如果补货时把背包里 64 个全塞进副手，
      * 下一次右键就会突然变成 6400 格，这种意外很难受。保持一致更符合直觉。
      *
-     * <p>只搬 {@link WarpDust} 认定的物品，不会碰玩家其它任何东西；
-     * 副手如果是别的物品（比如盾牌）则完全不动，免得覆盖掉。
+     * <p><b>只补同一种燃料</b>：模板由调用方（{@code TeleportFuel.templateOf}）
+     * 从事先记下的那叠燃料取，这里不去猜。副手放压缩粉却补成普通粉，
+     * 等于偷偷把玩家的配置改成十分之一。
+     *
+     * <p>副手如果是别的物品（比如盾牌）则完全不动，免得覆盖掉。
      */
-    private void refillOffhand(ServerPlayer player, int want) {
-        if (want <= 0) {
+    private void refillOffhand(ServerPlayer player, Item template, int want) {
+        if (want <= 0 || template == null) {
             return;
         }
         Inventory inventory = player.getInventory();
@@ -144,7 +154,7 @@ public class TeleportStaffItem extends Item {
 
         int current = 0;
         if (!offhand.isEmpty()) {
-            if (!WarpDust.isWarpDust(offhand)) {
+            if (!TeleportFuel.isFuel(offhand)) {
                 return; // 副手放的是别的东西（盾牌之类），不要覆盖
             }
             current = offhand.getCount();
@@ -153,17 +163,12 @@ public class TeleportStaffItem extends Item {
             return;
         }
 
-        // 用刚消耗掉的那一叠作为模板；副手被清空到 0 时它仍然持有物品引用，
-        // 所以正常路径下不会走到 WarpDust.item() 的兜底分支。
-        Item template = offhand.isEmpty() ? WarpDust.item() : offhand.getItem();
-        if (template == null) {
-            return; // 传送石碑不在（理论上进不来，防御性判空）
-        }
-
         // 只遍历背包主格（0..35），不含盔甲和副手自己。
+        // 关键：只搬【和模板同一种】的燃料。如果不管种类地搬，
+        // 副手放压缩粉时可能被普通粉填上，下一次右键的距离直接缩到十分之一。
         for (int i = 0; i < Inventory.INVENTORY_SIZE && current < want; i++) {
             ItemStack slot = inventory.getItem(i);
-            if (slot.isEmpty() || !WarpDust.isWarpDust(slot)) {
+            if (slot.isEmpty() || slot.getItem() != template) {
                 continue;
             }
             int moved = Math.min(want - current, slot.getCount());
@@ -220,11 +225,15 @@ public class TeleportStaffItem extends Item {
                                 List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("tooltip.teleport_staff.usage")
                 .withStyle(ChatFormatting.GRAY));
+        // 两种燃料的单价分开列，玩家一眼能看出压缩粉值 10 倍。
         tooltip.add(Component.translatable("tooltip.teleport_staff.distance",
                         Config.BLOCKS_PER_DUST.get())
                 .withStyle(ChatFormatting.DARK_AQUA));
-        tooltip.add(Component.translatable("tooltip.teleport_staff.stack")
+        tooltip.add(Component.translatable("tooltip.teleport_staff.distance_compressed",
+                        Config.COMPRESSED_BLOCKS_PER_DUST.get())
                 .withStyle(ChatFormatting.DARK_AQUA));
+        tooltip.add(Component.translatable("tooltip.teleport_staff.stack")
+                .withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("tooltip.teleport_staff.cardinal")
                 .withStyle(ChatFormatting.DARK_GRAY));
     }

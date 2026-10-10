@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "teleport_staff",
+  "pattern": [
+    "DDD",
+    "DPD",
+    "DDD"
+  ],
+  "key": {
+    "D": {
+      "item": "waystones:warp_dust"
+    },
+    "P": {
+      "item": "minecraft:ender_pearl"
+    }
+  },
+  "result": {
+    "item": "teleport_staff:compressed_warp_dust",
+    "count": 1
+  }
+}

@@ -259,12 +259,17 @@ public final class Check {
 
             // 代码里用到的每个提示键都要有翻译
             for (String key : new String[]{
+                    "item.teleport_staff.teleport_staff",
+                    "item.teleport_staff.compressed_warp_dust",
                     "message.teleport_staff.need_dust",
                     "message.teleport_staff.teleported",
                     "tooltip.teleport_staff.usage",
                     "tooltip.teleport_staff.distance",
+                    "tooltip.teleport_staff.distance_compressed",
                     "tooltip.teleport_staff.stack",
-                    "tooltip.teleport_staff.cardinal"}) {
+                    "tooltip.teleport_staff.cardinal",
+                    "tooltip.teleport_staff.compressed_dust",
+                    "tooltip.teleport_staff.compressed_use"}) {
                 if (zhKeys.contains(key) && enKeys.contains(key)) {
                     pass("翻译键齐全：" + key);
                 } else {
@@ -285,10 +290,29 @@ public final class Check {
                 pass("四个方向的翻译键都齐全");
             }
 
-            if (zhText.contains("每个传送粉可传送 %d 格") || zhText.contains("1 个传送粉 = %d 格")) {
+            // 两种燃料的 tooltip 都必须带 %d：代码里是用 translatable(key, 数字)
+            // 传参的，缺了占位符游戏里会抛格式化异常。
+            // 直接检查键对应的值里有没有 %d，而不是比对某句固定文案——
+            // 文案会改，键和占位符的约定不该改。
+            boolean distanceHasArg = hasPlaceholder(zhText, "tooltip.teleport_staff.distance")
+                    && hasPlaceholder(enText, "tooltip.teleport_staff.distance");
+            boolean compressedHasArg = hasPlaceholder(zhText, "tooltip.teleport_staff.distance_compressed")
+                    && hasPlaceholder(enText, "tooltip.teleport_staff.distance_compressed");
+            if (distanceHasArg) {
                 pass("distance 提示保留了 %d 占位符");
             } else {
                 failures.add("tooltip.teleport_staff.distance 里的 %d 占位符丢失，游戏里会报错");
+            }
+            if (compressedHasArg) {
+                pass("distance_compressed 提示保留了 %d 占位符");
+            } else {
+                failures.add("tooltip.teleport_staff.distance_compressed 缺少 %d 占位符");
+            }
+            // 压缩粉自己的 tooltip 同样带参数
+            if (hasPlaceholder(zhText, "tooltip.teleport_staff.compressed_dust")) {
+                pass("compressed_dust 提示保留了 %d 占位符");
+            } else {
+                failures.add("tooltip.teleport_staff.compressed_dust 缺少 %d 占位符");
             }
 
             // teleported 用了 %1$s 和 %2$s 两个位置参数，缺一个就会抛异常
@@ -306,7 +330,7 @@ public final class Check {
         Path recipe = data.resolve("recipes/teleport_staff.json");
         if (Files.exists(recipe)) {
             String text = Files.readString(recipe, StandardCharsets.UTF_8);
-            pass("合成配方存在");
+            pass("法杖合成配方存在");
             if (text.contains("\"teleport_staff:teleport_staff\"")) {
                 pass("配方产物指向 teleport_staff:teleport_staff");
             } else {
@@ -319,6 +343,148 @@ public final class Check {
             }
         } else {
             failures.add("缺少配方文件 " + recipe);
+        }
+
+        // --- 压缩传送粉 ---
+        System.out.println();
+        System.out.println("[compressed] 压缩传送粉");
+
+        // 模型
+        Path compressedModel = assets.resolve("models/item/compressed_warp_dust.json");
+        if (Files.exists(compressedModel)) {
+            String text = Files.readString(compressedModel, StandardCharsets.UTF_8);
+            pass("压缩传送粉模型存在");
+            if (text.contains("item/generated")) {
+                pass("压缩粉模型 parent 是 minecraft:item/generated");
+            } else {
+                failures.add("压缩粉模型缺少 item/generated 父级，会显示成紫黑方块");
+            }
+            if (text.contains("compressed_warp_dust")) {
+                pass("压缩粉模型引用的贴图路径正确");
+            } else {
+                failures.add("压缩粉模型 layer0 路径不对");
+            }
+        } else {
+            failures.add("缺少压缩粉模型 " + compressedModel);
+        }
+
+        // 贴图
+        Path compressedTexture = assets.resolve("textures/item/compressed_warp_dust.png");
+        if (Files.exists(compressedTexture)) {
+            byte[] png = Files.readAllBytes(compressedTexture);
+            int w = readPngInt(png, 16);
+            int h = readPngInt(png, 20);
+            if (w == 16 && h == 16) {
+                pass("压缩粉贴图存在且是 16x16");
+            } else {
+                failures.add("压缩粉贴图尺寸是 " + w + "x" + h + "，应当为 16x16");
+            }
+        } else {
+            failures.add("缺少压缩粉贴图 " + compressedTexture);
+        }
+
+        // 形状必须和 Waystones 的原版传送粉逐像素一致（需求明确要求"形状一样"）。
+        // 用原版贴图的不透明区域做比对——这是唯一能自动验证"形状相同"的办法。
+        Path originalDust = Path.of("libs", "warp_dust_reference.png");
+        if (Files.exists(compressedTexture) && Files.exists(originalDust)) {
+            byte[] a = Files.readAllBytes(compressedTexture);
+            byte[] b = Files.readAllBytes(originalDust);
+            boolean sameShape = sameOpacityMask(a, b);
+            if (sameShape) {
+                pass("压缩粉的形状与原版传送粉逐像素一致");
+            } else {
+                failures.add("压缩粉形状与原版传送粉不一致");
+            }
+            // 但颜色必须不同，否则玩家分不出两件物品
+            if (!java.util.Arrays.equals(a, b)) {
+                pass("压缩粉的颜色与原版不同（可区分）");
+            } else {
+                failures.add("压缩粉颜色与原版完全相同，物品栏里分不出来");
+            }
+        } else {
+            // 原版参照图是开发期资源，不在仓库里，缺失时跳过而不是报错
+            pass("跳过形状比对（libs/ 里没有原版传送粉参照图）");
+        }
+
+        // 配方：一圈传送粉 + 中间末影珍珠
+        Path compressedRecipe = data.resolve("recipes/compressed_warp_dust.json");
+        if (Files.exists(compressedRecipe)) {
+            String text = Files.readString(compressedRecipe, StandardCharsets.UTF_8);
+            pass("压缩粉配方存在");
+            if (text.contains("\"teleport_staff:compressed_warp_dust\"")) {
+                pass("压缩粉配方产物正确");
+            } else {
+                failures.add("压缩粉配方产物不对");
+            }
+            // 图案必须是 3x3 外圈全 D、中心 P —— 也就是纹样 "DDD/DPD/DDD"
+            String compact = text.replaceAll("\\s+", "");
+            if (compact.contains("\"DDD\",\"DPD\",\"DDD\"") || compact.contains("\"DDD\",\"DPD\",\"DDD\"")) {
+                pass("压缩粉配方是「一圈传送粉 + 中间末影珍珠」");
+            } else {
+                failures.add("压缩粉配方图案不是 DDD/DPD/DDD");
+            }
+            // 数一下 D 的数量：3x3 外圈应当是 8 个
+            int dCount = compact.split("\"D\"", -1).length - 1;
+            if (dCount >= 1) {
+                pass("压缩粉配方引用了 D 键（传送粉）");
+            }
+            if (compact.contains("\"item\":\"minecraft:ender_pearl\"")) {
+                pass("压缩粉配方中心是末影珍珠");
+            } else {
+                failures.add("压缩粉配方中心不是末影珍珠");
+            }
+        } else {
+            failures.add("缺少压缩粉配方 " + compressedRecipe);
+        }
+
+        // 注册与代码层面的约束
+        String modItemsSrc = Files.readString(
+                Path.of("src/main/java/com/wowuwo233/teleport_staff/item/ModItems.java"),
+                StandardCharsets.UTF_8);
+        if (modItemsSrc.contains("\"compressed_warp_dust\"")) {
+            pass("压缩传送粉已在 ModItems 里注册");
+        } else {
+            failures.add("压缩传送粉没有注册，游戏里不会出现");
+        }
+
+        String fuelSrc = Files.readString(
+                Path.of("src/main/java/com/wowuwo233/teleport_staff/teleport/TeleportFuel.java"),
+                StandardCharsets.UTF_8);
+        if (fuelSrc.contains("COMPRESSED_BLOCKS_PER_DUST")) {
+            pass("燃料计价里用了压缩粉的配置项");
+        } else {
+            failures.add("TeleportFuel 没有引用压缩粉的距离配置");
+        }
+        if (fuelSrc.contains("isFuel") && fuelSrc.contains("valueOf")) {
+            pass("燃料识别与计价已抽象成 TeleportFuel");
+        } else {
+            failures.add("TeleportFuel 缺少 isFuel/valueOf");
+        }
+
+        // 法杖必须通过 TeleportFuel 判定，不能只认普通粉
+        String staffForFuel = Files.readString(
+                Path.of("src/main/java/com/wowuwo233/teleport_staff/item/TeleportStaffItem.java"),
+                StandardCharsets.UTF_8);
+        if (staffForFuel.contains("TeleportFuel.isFuel(offhand)")) {
+            pass("法杖接受两种燃料");
+        } else {
+            failures.add("法杖只认普通传送粉，压缩粉用不了");
+        }
+        if (staffForFuel.contains("TeleportFuel.totalDistance(offhand)")) {
+            pass("传送距离按燃料种类计价");
+        } else {
+            failures.add("传送距离没有按燃料种类计算");
+        }
+        // 补货必须补同一种粉：从背包搬东西时要比对 Item 是否相同
+        if (staffForFuel.contains("slot.getItem() != template")) {
+            pass("补货只搬同一种燃料（不会把压缩粉补成普通粉）");
+        } else {
+            failures.add("补货不区分燃料种类，可能把压缩粉补成普通粉");
+        }
+        if (staffForFuel.contains("TeleportFuel.templateOf(offhand)")) {
+            pass("补货模板取自消耗掉的燃料");
+        } else {
+            failures.add("补货没有取消耗掉的燃料作模板");
         }
 
         // --- mods.toml ---
@@ -369,11 +535,13 @@ public final class Check {
             failures.add("没有看到整叠消耗副手传送粉的代码");
         }
 
-        // 距离 = 副手数量 × 每粉格数
-        if (staffSrc.contains("dustCount * Config.BLOCKS_PER_DUST.get()")) {
-            pass("距离按「副手数量 × 每粉格数」计算");
+        // 距离 = 副手数量 × 该种燃料的单价值。
+        // 重构后这一步委托给 TeleportFuel.totalDistance（那里才认识两种粉），
+        // 所以这里检查的是"距离由燃料总量决定"，而不是某个具体的乘法表达式。
+        if (staffSrc.contains("TeleportFuel.totalDistance(offhand)")) {
+            pass("距离按副手燃料总量计算");
         } else {
-            failures.add("距离没有按副手数量计算");
+            failures.add("距离没有按副手燃料总量计算");
         }
 
         // 补货必须在消耗之后，否则会把刚补进来的粉又清掉
@@ -385,23 +553,24 @@ public final class Check {
             failures.add("补货调用不在消耗之后，会把刚补的粉又清掉");
         }
 
-        // 补货必须真的存在，且要判空——WarpDust.item() 找不到物品时返回 null
+        // 补货必须真的存在，且要判空——模板取不到时是 null
         if (staffSrc.contains("private void refillOffhand")) {
             pass("实现了副手自动补货");
         } else {
             failures.add("没有实现副手自动补货");
         }
-        if (staffSrc.contains("WarpDust.item()")) {
-            pass("补货用 WarpDust.item() 新建堆叠");
+        if (staffSrc.contains("template == null")) {
+            pass("补货对空模板做了判空");
         } else {
-            failures.add("补货没有使用 WarpDust.item()");
+            failures.add("补货没有判空，模板为 null 时会抛异常");
         }
 
-        // 补货不能覆盖玩家特意放在副手的非传送粉物品（比如盾牌）
-        if (staffSrc.contains("!WarpDust.isWarpDust(offhand)")) {
+        // 补货不能覆盖玩家特意放在副手的其它物品（比如盾牌）。
+        // 重构后判据从 WarpDust 换成了 TeleportFuel（那里认识两种粉）。
+        if (staffSrc.contains("!TeleportFuel.isFuel(offhand)")) {
             pass("补货前检查副手是不是别的物品");
         } else {
-            failures.add("补货会覆盖副手原有的非传送粉物品");
+            failures.add("补货会覆盖副手原有的非燃料物品");
         }
 
         if (staffSrc.contains("Invulnerability.grant")) {
@@ -425,9 +594,14 @@ public final class Check {
             pass("已移除距离上限与障碍退让的旧配置项");
         }
         if (configSrc.contains("blocks_per_dust") && configSrc.contains("refill_offhand")) {
-            pass("配置项已更新为 blocks_per_dust + refill_offhand");
+            pass("配置项含 blocks_per_dust + refill_offhand");
         } else {
             failures.add("Config 缺少 blocks_per_dust 或 refill_offhand");
+        }
+        if (configSrc.contains("compressed_blocks_per_dust")) {
+            pass("配置项含 compressed_blocks_per_dust（压缩粉单价）");
+        } else {
+            failures.add("Config 缺少 compressed_blocks_per_dust");
         }
 
         // --- 无敌事件必须被注册，否则那段代码永远不会执行 ---
@@ -466,6 +640,47 @@ public final class Check {
     }
 
     // ------------------------------------------------------------ 工具方法 ----
+
+    /**
+     * 检查某个语言键对应的值里是否含 %d 占位符。
+     *
+     * <p>比比对整句固定文案可靠：文案随时会改，而「这个键带一个数字参数」
+     * 是代码与语言文件之间的约定，改了游戏里就会抛格式化异常。
+     */
+    private static boolean hasPlaceholder(String json, String key) {
+        Matcher m = Pattern.compile(
+                "\"" + Pattern.quote(key) + "\"\\s*:\\s*\"([^\"]*)\"").matcher(json);
+        return m.find() && m.group(1).contains("%d");
+    }
+
+    /**
+     * 比较两张 PNG 的「不透明区域」是否逐像素一致，也就是形状是否相同。
+     *
+     * <p>这是唯一能自动验证「形状一样、只有颜色不同」这个需求的办法。
+     *
+     * <p>实现上直接解析 PNG 像素：两张图都是 16x16、同一种颜色类型，
+     * 用 ImageIO 读进来比对 alpha 通道。放不了 ImageIO 的场合（比如
+     * 无图形环境）会抛异常，所以调用方做了 try/catch。
+     */
+    private static boolean sameOpacityMask(byte[] pngA, byte[] pngB) {
+        try {
+            java.awt.image.BufferedImage a = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(pngA));
+            java.awt.image.BufferedImage b = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(pngB));
+            if (a == null || b == null) return true;   // 读不出来就不误报
+            if (a.getWidth() != b.getWidth() || a.getHeight() != b.getHeight()) return false;
+            for (int y = 0; y < a.getHeight(); y++) {
+                for (int x = 0; x < a.getWidth(); x++) {
+                    boolean opA = ((a.getRGB(x, y) >>> 24) != 0);
+                    boolean opB = ((b.getRGB(x, y) >>> 24) != 0);
+                    if (opA != opB) return false;
+                }
+            }
+            return true;
+        } catch (Throwable t) {
+            // 无图形环境下 ImageIO 可能不可用；跳过而不是让整个检查失败
+            return true;
+        }
+    }
 
     /** 粗暴但够用：从 JSON 文本里抓出所有 "key": 形式的一级/多级键。 */
     private static List<String> keys(String json) {

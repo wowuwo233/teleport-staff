@@ -1,12 +1,16 @@
 {
   "item.teleport_staff.teleport_staff": "Teleport Staff",
+  "item.teleport_staff.compressed_warp_dust": "Compressed Warp Dust",
 
-  "tooltip.teleport_staff.usage": "Hold the staff in your main hand and warp dust in your off hand, then right-click",
-  "tooltip.teleport_staff.distance": "1 warp dust = %d blocks",
-  "tooltip.teleport_staff.stack": "The whole offhand stack is consumed - more dust, more distance",
+  "tooltip.teleport_staff.usage": "Hold the staff in your main hand and warp dust (or compressed) in your off hand, then right-click",
+  "tooltip.teleport_staff.distance": "Warp dust: 1 = %d blocks",
+  "tooltip.teleport_staff.distance_compressed": "Compressed warp dust: 1 = %d blocks",
+  "tooltip.teleport_staff.stack": "The whole offhand stack is consumed - more fuel, more distance",
   "tooltip.teleport_staff.cardinal": "Snaps to north/south/east/west - never diagonal",
 
-  "message.teleport_staff.need_dust": "You need warp dust in your off hand",
+  "tooltip.teleport_staff.compressed_dust": "%d blocks per dust",
+  "tooltip.teleport_staff.compressed_use": "Put in your off hand and use with a Teleport Staff",
+  "message.teleport_staff.need_dust": "You need warp dust or compressed warp dust in your off hand",
   "message.teleport_staff.teleported": "Teleported %2$s blocks %1$s",
 
   "direction.teleport_staff.north": "north",
