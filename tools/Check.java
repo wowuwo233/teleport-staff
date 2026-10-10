@@ -637,6 +637,62 @@ public final class Check {
         } else {
             failures.add("没有处理世界边界");
         }
+
+        // --- ★ 每个注册的物品都必须出现在某个创造模式标签页里 ---
+        //
+        // 这条是补的：1.3.0 加了压缩传送粉，却忘了在 addCreative 里 accept 它，
+        // 结果物品能合成、能被命令给予，但创造物品栏里根本找不到。
+        // Forge 只自动注册物品，不会自动放进标签页——这个坑不写测试就会再踩。
+        //
+        // 关键在于【从 ModItems 源码里反推物品名单】，而不是把物品名硬编码一遍：
+        // 硬编码的话，以后新增物品时测试同样会漏掉它，等于白写。
+        checkCreativeTabs(modSrc);
+    }
+
+    /**
+     * 校验 ModItems 里注册的每个物品都被加进了某个创造标签页。
+     *
+     * <p>用源码文本做静态检查（而不是运行时反射）：脱机测试跑不了 Minecraft，
+     * 拿不到真实的注册表。好在「注册了什么」和「加进了哪个标签页」
+     * 都是能从源码里认出来的固定写法，静态检查足够可靠。
+     */
+    private static void checkCreativeTabs(String modSrc) throws IOException {
+        String itemsSrc = Files.readString(
+                Path.of("src/main/java/com/wowuwo233/teleport_staff/item/ModItems.java"),
+                StandardCharsets.UTF_8);
+
+        // 抓出所有 ITEMS.register("名字", ...) 里的物品名
+        List<String> registered = new ArrayList<>();
+        Matcher m = Pattern.compile("ITEMS\\.register\\(\\s*\"([a-z0-9_]+)\"").matcher(itemsSrc);
+        while (m.find()) {
+            registered.add(m.group(1));
+        }
+
+        if (registered.isEmpty()) {
+            failures.add("没能从 ModItems.java 里解析出任何物品（正则过时了？）");
+            return;
+        }
+        pass("解析到 " + registered.size() + " 个已注册物品：" + registered);
+
+        // 从 TeleportStaffMod.java 的 addCreative 里抓出所有被 accept 的常量名
+        String accepted = modSrc;
+
+        int missing = 0;
+        for (String item : registered) {
+            // 物品名 → ModItems 里的常量名。约定是「全大写下划线」，
+            // 例如 compressed_warp_dust → COMPRESSED_WARP_DUST。
+            String constant = item.toUpperCase(java.util.Locale.ROOT);
+            if (accepted.contains("ModItems." + constant + ".get()")) {
+                pass("创造标签页包含：" + item);
+            } else {
+                missing++;
+                failures.add("物品 " + item + " 没有加进任何创造模式标签页"
+                        + "（玩家在创造物品栏里找不到它，但能合成出来）");
+            }
+        }
+        if (missing == 0) {
+            pass("所有已注册物品都能在创造物品栏里找到");
+        }
     }
 
     // ------------------------------------------------------------ 工具方法 ----

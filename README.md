@@ -3,7 +3,7 @@
 新增 **传送法杖** 与 **压缩传送粉**：主手拿法杖、副手拿传送粉（**传送石碑 / Waystones** 模组的），
 右键就朝你面朝的方向传送。副手的燃料**整叠一次消耗**，有多少传多远。
 
-作者 **wowuwo233** · 版本 **1.3.0** · MC **1.20.1** · Forge **47.4.26**
+作者 **wowuwo233** · 版本 **1.3.1** · MC **1.20.1** · Forge **47.4.26**
 
 ---
 
@@ -107,7 +107,7 @@
 | Java | **17**（`C:\Program Files\Java\jdk-17`） |
 | Gradle | 8.8（`D:\DSH work\.gradle-home`） |
 | 传送石碑 Waystones | 14.1.21（`libs/` 内） |
-| 模组版本 | 1.3.0 |
+| 模组版本 | 1.3.1 |
 
 > MC 1.20.1 / Forge 47.x 的编译与运行目标都是 **Java 17**，用 JDK 21 会报 class file version 错误。
 
@@ -116,7 +116,7 @@
 ## 3. 常用命令
 
 ```powershell
-.\dev.ps1 build            # 编译，产物 build\libs\teleport_staff-1.3.0.jar
+.\dev.ps1 build            # 编译，产物 build\libs\teleport_staff-1.3.1.jar
 .\dev.ps1 runClient        # 启动开发版客户端
 .\dev.ps1 runServer        # 启动开发版服务端
 .\dev.ps1 clean
@@ -163,7 +163,7 @@ PowerShell 若报「禁止运行脚本」，改用 `dev.cmd build`。
 
 | 装什么 | 文件 | 必需? |
 |---|---|---|
-| **本模组** | `teleport_staff-1.3.0.jar` | ✅ |
+| **本模组** | `teleport_staff-1.3.1.jar` | ✅ |
 | 传送石碑 | `waystones-forge-1.20.1-14.1.21.jar` | ✅ 硬依赖 |
 | **Balm** | `balm-forge-1.20.1-7.3.43.jar` | ✅ **Waystones 的前置，漏了会崩** |
 
@@ -178,7 +178,7 @@ PowerShell 若报「禁止运行脚本」，改用 `dev.cmd build`。
 > 传送石碑和 Balm 是别人做的模组，从这个仓库再分发它们不合适，
 > 也没有这个必要——它们各自有官方发布页。本模组自己用
 > [GitHub Releases](../../releases) 发布，那里能下到编译好的
-> `teleport_staff-1.3.0.jar`。
+> `teleport_staff-1.3.1.jar`。
 
 ---
 
@@ -345,6 +345,25 @@ libs 目录为空时项目照样能构建。
 `setDeltaMovement(Vec3.ZERO)` + `resetFallDistance()` + `hurtMarked = true`。
 不清的话从高处往下传会立刻摔死，或者客户端继续按旧速度飘出去。
 
+### 7.13 物品必须手动加进创造标签页
+
+Forge **只自动注册物品，不会把它们放进任何创造模式物品栏**。
+要出现在创造菜单里，必须监听 `BuildCreativeModeTabContentsEvent` 自己 `accept`。
+
+这个坑很隐蔽，因为漏了之后物品**并没有消失**：它还在注册表里，
+可以合成、可以被 `/give` 给予、可以正常使用——只是创造模式的玩家翻遍物品栏
+也找不到它。1.3.0 就是这样漏掉了压缩传送粉（[§8](#8-回归测试) 有记录）。
+
+两件物品分开放，按各自的性质：
+
+| 物品 | 标签页 | 理由 |
+|---|---|---|
+| 传送法杖 | `TOOLS_AND_UTILITIES`（工具与实用物品） | 和末影珍珠、望远镜这类功能道具一起 |
+| 压缩传送粉 | `INGREDIENTS`（材料） | 是合成出来的中间产物，不是工具；和火药、红石一类堆叠材料放一起，更符合查找直觉 |
+
+对应的回归测试**从 `ModItems.java` 源码反推物品名单**，而不是把物品名再硬编码一遍——
+硬编码的话，以后新增物品时测试同样会漏掉它，等于白写。
+
 ---
 
 ## 8. 回归测试
@@ -359,7 +378,7 @@ New-Item -ItemType Directory -Force -Path build\tools-check | Out-Null
 & "$jdk\java.exe" "-Dfile.encoding=UTF-8" -cp build\tools-check com.wowuwo233.teleport_staff.Check
 ```
 
-覆盖 **95 项**：
+覆盖 **99 项**：
 
 - **方位吸附**——四个正方向、八种斜向、45° 平局的四种情况、临界角两侧、
   垂直俯仰的退化输入、整圈 360° 均分到四向、yaw 回绕不抖动
@@ -379,7 +398,9 @@ New-Item -ItemType Directory -Force -Path build\tools-check | Out-Null
   **补货只搬同一种燃料**、补货会判空、不会覆盖副手的非燃料物品、
   授予无敌、调用方位吸附、位移走 offsetX/offsetZ、
   **先加载目标区块再取地表高度**、考虑了世界边界、
-  旧的距离上限配置项已彻底移除、无敌处理器确实注册到了事件总线
+  旧的距离上限配置项已彻底移除、无敌处理器确实注册到了事件总线、
+  **每个已注册物品都出现在某个创造模式标签页里**（物品名单从 `ModItems.java`
+  源码反推，不是硬编码——否则以后新增物品时测试同样会漏）
 
 > 测试确实抓到过真问题：
 > - 1.0.0 期间，浮点容差写成 `ceil(距离/额度 - 1e-9)`，容差加在**粉的个数**上
@@ -389,6 +410,9 @@ New-Item -ItemType Directory -Force -Path build\tools-check | Out-Null
 > - 1.3.0 加压缩粉时，4 条旧断言因为重构（`WarpDust` → `TeleportFuel`）而失败。
 >   这正是断言该做的事：**逼我确认每处行为变化都是有意为之**，
 >   而不是让重构悄悄改变行为。
+> - 1.3.0 发布后玩家在创造物品栏里找不到压缩粉——`addCreative` 漏了它。
+>   补上断言后我特意把 `accept` 注释掉重跑，确认测试真的会报错，
+>   而不是写了个永远绿的摆设。
 
 ---
 
@@ -398,8 +422,8 @@ New-Item -ItemType Directory -Force -Path build\tools-check | Out-Null
 
 - [x] `dev.cmd build --offline` → **BUILD SUCCESSFUL**（无警告，含 `jar` 与 `reobfJar`）
 - [x] 脱机回归测试 **ALL CHECKS PASSED (95)**
-- [x] 产物 `teleport_staff-1.3.0.jar` 内容核对：
-      `mods.toml` 的 `modId=teleport_staff` / `version=1.3.0` / `authors=wowuwo233`
+- [x] 产物 `teleport_staff-1.3.1.jar` 内容核对：
+      `mods.toml` 的 `modId=teleport_staff` / `version=1.3.1` / `authors=wowuwo233`
       与 `gradle.properties` 一致；模型、贴图、中英语言、配方都在包内
 - [x] `mods.toml` 声明了 `waystones` 硬依赖（`mandatory=true`）
 - [x] 物品贴图：法杖与压缩粉都是 16×16，生成后人工看过预览图与并排对比图
@@ -423,14 +447,16 @@ New-Item -ItemType Directory -Force -Path build\tools-check | Out-Null
 - [ ] 传送后无敌是否真的挡住了摔落伤害
 - [ ] **自动补货是否按预期工作**（背包里的燃料有没有正确转移到副手）
 - [ ] **压缩粉配方能否正常合成、压缩粉能否正常使用**
+- [ ] **创造物品栏里能不能找到压缩粉**（1.3.1 修了，但只能进游戏确认）
 - [ ] **传 6400 格 / 64000 格时服务器卡顿到什么程度**
 - [ ] 粒子与音效的表现
 - [ ] 合成配方在 JEI / 工作台里的显示
 - [ ] 正式游戏里三个 jar 一起装的实际加载
 
-> 请在正式游戏里测：把 `teleport_staff-1.3.0.jar`、`waystones-forge-1.20.1-14.1.21.jar`、
+> 请在正式游戏里测：把 `teleport_staff-1.3.1.jar`、`waystones-forge-1.20.1-14.1.21.jar`、
 > `balm-forge-1.20.1-7.3.43.jar` 一起放进 `mods`（三个都要，见 [§5](#5-安装正式游戏里怎么装)）。
-> 创造模式物品栏的「工具与实用物品」页里有法杖，配上传送粉（或压缩粉）放副手就能试。
+> 创造模式物品栏里，法杖在「工具与实用物品」页、压缩传送粉在「材料」页，
+> 配上传送粉放副手就能试。
 
 ---
 
