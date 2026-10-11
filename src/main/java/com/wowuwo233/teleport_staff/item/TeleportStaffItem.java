@@ -2,10 +2,12 @@ package com.wowuwo233.teleport_staff.item;
 
 import com.wowuwo233.teleport_staff.Config;
 import com.wowuwo233.teleport_staff.teleport.CardinalDirection;
+import com.wowuwo233.teleport_staff.teleport.Corrosion;
 import com.wowuwo233.teleport_staff.teleport.Invulnerability;
 import com.wowuwo233.teleport_staff.teleport.TeleportFuel;
 import com.wowuwo233.teleport_staff.teleport.TeleportTarget;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -213,6 +215,11 @@ public class TeleportStaffItem extends Item {
 
         level.playSound(null, to.x, to.y, to.z,
                 SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, 1.0F);
+
+        // 时空蚀斑：传送后把落点脚下的一片方块侵蚀成传送粉块。
+        // 用脚部坐标所在的格位做中心，Corrosion 内部会处理
+        // 「脚下第 0 / -1 层」的铺放与可替换判断。
+        Corrosion.corrode(level, BlockPos.containing(to.x, to.y - 0.1D, to.z));
     }
 
     private static void warn(Player player, String key) {
@@ -236,6 +243,8 @@ public class TeleportStaffItem extends Item {
                 .withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("tooltip.teleport_staff.cardinal")
                 .withStyle(ChatFormatting.DARK_GRAY));
+        tooltip.add(Component.translatable("tooltip.teleport_staff.corrosion")
+                .withStyle(ChatFormatting.DARK_PURPLE));
     }
 
     /** 常驻附魔光效：这是一件魔法道具，有光晕更好认。 */

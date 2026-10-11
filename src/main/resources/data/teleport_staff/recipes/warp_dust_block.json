@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "DDD",
+    "DDD",
+    "DDD"
+  ],
+  "key": {
+    "D": {
+      "item": "waystones:warp_dust"
+    }
+  },
+  "result": {
+    "item": "teleport_staff:warp_dust_block",
+    "count": 1
+  }
+}

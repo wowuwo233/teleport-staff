@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "teleport_staff:warp_dust_block"
+    }
+  ],
+  "result": {
+    "item": "waystones:warp_dust",
+    "count": 9
+  }
+}

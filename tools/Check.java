@@ -647,6 +647,213 @@ public final class Check {
         // 关键在于【从 ModItems 源码里反推物品名单】，而不是把物品名硬编码一遍：
         // 硬编码的话，以后新增物品时测试同样会漏掉它，等于白写。
         checkCreativeTabs(modSrc);
+
+        checkWarpDustBlock();
+        checkCorrosion();
+    }
+
+    /**
+     * 传送粉块 + 时空蚀斑（1.4.0 新增）的完整性检查。
+     *
+     * <p>传送粉块是一个「方块」而不是物品：它需要方块状态、方块模型、
+     * 方块贴图、方块物品（BlockItem）以及合成/拆解配方五样东西都齐全，
+     * 少一样游戏里就是紫黑方块或无声失败。这些核对不了运行时，只能静态查。
+     */
+    private static void checkWarpDustBlock() throws IOException {
+        System.out.println();
+        System.out.println("[warp_dust_block] 传送粉块");
+
+        Path assets = Path.of("src/main/resources/assets/teleport_staff");
+        Path data = Path.of("src/main/resources/data/teleport_staff");
+
+        // 方块状态
+        Path blockstate = assets.resolve("blockstates/warp_dust_block.json");
+        if (Files.exists(blockstate) && Files.readString(blockstate, StandardCharsets.UTF_8)
+                .contains("teleport_staff:block/warp_dust_block")) {
+            pass("传送粉块的 blockstate 存在并指向正确模型");
+        } else {
+            failures.add("缺少或错误传送粉块 blockstate（方块会显示成紫黑）");
+        }
+
+        // 方块模型
+        Path blockModel = assets.resolve("models/block/warp_dust_block.json");
+        if (Files.exists(blockModel)
+                && Files.readString(blockModel, StandardCharsets.UTF_8).contains("cube_all")) {
+            pass("传送粉块的方块模型存在且 parent 为 cube_all");
+        } else {
+            failures.add("缺少或错误传送粉块方块模型");
+        }
+
+        // 方块贴图
+        Path blockTexture = assets.resolve("textures/block/warp_dust_block.png");
+        if (Files.exists(blockTexture)) {
+            byte[] png = Files.readAllBytes(blockTexture);
+            int w = readPngInt(png, 16);
+            int h = readPngInt(png, 20);
+            if (w == 16 && h == 16) {
+                pass("传送粉块贴图存在且是 16x16");
+            } else {
+                failures.add("传送粉块贴图尺寸是 " + w + "x" + h + "，应当为 16x16");
+            }
+        } else {
+            failures.add("缺少传送粉块贴图 " + blockTexture);
+        }
+
+        // 方块物品模型（物品栏里显示的形态）
+        Path itemModel = assets.resolve("models/item/warp_dust_block.json");
+        if (Files.exists(itemModel)
+                && Files.readString(itemModel, StandardCharsets.UTF_8).contains("warp_dust_block")) {
+            pass("传送粉块的物品模型存在");
+        } else {
+            failures.add("缺少传送粉块物品模型 " + itemModel);
+        }
+
+        // 合成配方：9 个传送粉 -> 1 个块
+        Path recipe = data.resolve("recipes/warp_dust_block.json");
+        if (Files.exists(recipe)) {
+            String text = Files.readString(recipe, StandardCharsets.UTF_8);
+            String compact = text.replaceAll("\\s+", "");
+            if (compact.contains("teleport_staff:warp_dust_block")
+                    && compact.contains("waystones:warp_dust")) {
+                pass("传送粉块合成配方存在（9 粉 -> 1 块）");
+            } else {
+                failures.add("传送粉块合成配方产物或原料不对");
+            }
+            int dCount = compact.split("\"D\"", -1).length - 1;
+            // pattern 里的 D 是不带引号的（如 "DDD"/"DDD"/"DDD"），单独数一遍。
+            // 9 个 D 每行是 3 个、三行就是 9。key 定义里的单字符 "D" 要排除，
+            // 所以只匹配连续至少 3 个 D 的串（即 pattern 的整行）。
+            Matcher dMatcher = Pattern.compile("\"(D{3,})\"").matcher(compact);
+            int patternD = 0;
+            while (dMatcher.find()) {
+                patternD += dMatcher.group(1).length();
+            }
+            if (patternD == 9) {
+                pass("传送粉块配方是 3x3 全填传送粉（9 个）");
+            } else {
+                failures.add("传送粉块配方不是 9 个传送粉（实际 pattern 里 " + patternD + " 个 D）");
+            }
+        } else {
+            failures.add("缺少传送粉块配方 " + recipe);
+        }
+
+        // 拆解配方：1 个块 -> 9 个粉
+        Path uncraft = data.resolve("recipes/warp_dust_block_uncraft.json");
+        if (Files.exists(uncraft)
+                && Files.readString(uncraft, StandardCharsets.UTF_8).contains("waystones:warp_dust")) {
+            pass("传送粉块拆解配方存在（1 块 -> 9 粉）");
+        } else {
+            failures.add("缺少传送粉块拆解配方 " + uncraft);
+        }
+
+        // 方块已在 ModBlocks 注册，且有 BlockItem 物品形态
+        String blocksSrc = Files.readString(
+                Path.of("src/main/java/com/wowuwo233/teleport_staff/block/ModBlocks.java"),
+                StandardCharsets.UTF_8);
+        if (blocksSrc.contains("\"warp_dust_block\"")) {
+            pass("传送粉块已在 ModBlocks 注册");
+        } else {
+            failures.add("传送粉块没有在 ModBlocks 注册");
+        }
+        String itemsSrc = Files.readString(
+                Path.of("src/main/java/com/wowuwo233/teleport_staff/item/ModItems.java"),
+                StandardCharsets.UTF_8);
+        if (itemsSrc.contains("BlockItem") && itemsSrc.contains("ModBlocks.WARP_DUST_BLOCK")) {
+            pass("传送粉块有 BlockItem 物品形态");
+        } else {
+            failures.add("传送粉块缺少 BlockItem，拿不到物品形态");
+        }
+
+        // 掉落物：战利品表（loot table）。没有它，生存模式挖掉方块什么都不掉——
+        // 这个坑和压缩粉漏加进创造栏一样隐蔽：方块本身能放置、能合成，
+        // 但挖掉后凭空消失，玩家会以为粉被吞了。
+        // 掉的是普通传送粉（waystones:warp_dust），不是粉块本身——
+        // 避免「挖掉 -> 拆回 9 粉 -> 再压块」的无限回收通胀。
+        Path loot = data.resolve("loot_tables/blocks/warp_dust_block.json");
+        if (Files.exists(loot)) {
+            String lootText = Files.readString(loot, StandardCharsets.UTF_8);
+            if (lootText.contains("waystones:warp_dust")
+                    && lootText.contains("survives_explosion")) {
+                pass("传送粉块有战利品表（挖掉掉落普通传送粉，爆炸不掉）");
+            } else {
+                failures.add("传送粉块战利品表产物或爆炸条件不对");
+            }
+        } else {
+            failures.add("缺少传送粉块战利品表，生存模式挖掉无掉落 " + loot);
+        }
+    }
+
+    /**
+     * 时空蚀斑（传送后把方块换成粉块）的静态检查。
+     *
+     * <p>这段逻辑跑不了游戏，只能查代码文本：Corrosion 类是否存在、
+     * 是否被 doTeleport 调用、配置项是否齐全、是否有「只替换可替换方块」的保守判断。
+     */
+    private static void checkCorrosion() throws IOException {
+        System.out.println();
+        System.out.println("[corrosion] 时空蚀斑");
+
+        Path corrosionPath = Path.of(
+                "src/main/java/com/wowuwo233/teleport_staff/teleport/Corrosion.java");
+        if (Files.exists(corrosionPath)) {
+            String src = Files.readString(corrosionPath, StandardCharsets.UTF_8);
+            pass("Corrosion 类存在");
+            if (src.contains("hasBlockEntity()")) {
+                pass("蚀斑会跳过带方块实体的方块（不毁箱子里东西）");
+            } else {
+                failures.add("蚀斑没有跳过方块实体，会毁掉箱子内容");
+            }
+            if (src.contains("getDestroySpeed") || src.contains("getCollisionShape")) {
+                pass("蚀斑对旧方块有保守判断（不替换不可破坏/非实心方块）");
+            } else {
+                failures.add("蚀斑缺少对不可破坏方块的保守判断");
+            }
+            if (src.contains("CORROSION_ENABLED") && src.contains("CORROSION_RADIUS")) {
+                pass("蚀斑读取腐蚀开关与半径配置");
+            } else {
+                failures.add("蚀斑没有读取腐蚀配置项");
+            }
+            if (src.contains("CORROSION_CHANCE") && src.contains("nextDouble")) {
+                pass("蚀斑有概率判定（不是每次必现）");
+            } else {
+                failures.add("蚀斑缺少概率判定，每次传送都会产生蚀斑");
+            }
+        } else {
+            failures.add("缺少 Corrosion.java");
+        }
+
+        String staffSrc = Files.readString(
+                Path.of("src/main/java/com/wowuwo233/teleport_staff/item/TeleportStaffItem.java"),
+                StandardCharsets.UTF_8);
+        if (staffSrc.contains("Corrosion.corrode")) {
+            pass("doTeleport 里调用了蚀斑逻辑");
+        } else {
+            failures.add("传送后没有调用蚀斑逻辑");
+        }
+
+        // ModBlocks 已注册到主类
+        String modSrc = Files.readString(
+                Path.of("src/main/java/com/wowuwo233/teleport_staff/TeleportStaffMod.java"),
+                StandardCharsets.UTF_8);
+        if (modSrc.contains("ModBlocks.register")) {
+            pass("方块注册已接入主类");
+        } else {
+            failures.add("ModBlocks 没有在主类注册");
+        }
+
+        // 腐蚀工具的翻译键要在语言文件里存在
+        String zh = Files.readString(
+                Path.of("src/main/resources/assets/teleport_staff/lang/zh_cn.json"),
+                StandardCharsets.UTF_8);
+        String en = Files.readString(
+                Path.of("src/main/resources/assets/teleport_staff/lang/en_us.json"),
+                StandardCharsets.UTF_8);
+        if (zh.contains("tooltip.teleport_staff.corrosion")
+                && en.contains("tooltip.teleport_staff.corrosion")) {
+            pass("蚀斑说明的中英文翻译键都在");
+        } else {
+            failures.add("缺少蚀斑说明的翻译键");
+        }
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.wowuwo233.teleport_staff;
 
+import com.wowuwo233.teleport_staff.block.ModBlocks;
 import com.wowuwo233.teleport_staff.item.ModItems;
 import com.wowuwo233.teleport_staff.teleport.Invulnerability;
 import net.minecraft.world.item.CreativeModeTabs;
@@ -27,6 +28,7 @@ public class TeleportStaffMod {
         IEventBus modBus = context.getModEventBus();
 
         ModItems.register(modBus);
+        ModBlocks.register(modBus);
         modBus.addListener(this::addCreative);
 
         // 配置文件注册在注入进来的 context 上，理由同上。
@@ -56,6 +58,8 @@ public class TeleportStaffMod {
             event.accept(ModItems.TELEPORT_STAFF.get());
         } else if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
             event.accept(ModItems.COMPRESSED_WARP_DUST.get());
+        } else if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
+            event.accept(ModItems.WARP_DUST_BLOCK.get());
         }
     }
 }

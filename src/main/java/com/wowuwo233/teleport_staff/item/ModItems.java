@@ -2,8 +2,10 @@ package com.wowuwo233.teleport_staff.item;
 
 import com.wowuwo233.teleport_staff.Config;
 import com.wowuwo233.teleport_staff.TeleportStaffMod;
+import com.wowuwo233.teleport_staff.block.ModBlocks;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
@@ -49,6 +51,19 @@ public final class ModItems {
                             .withStyle(ChatFormatting.GRAY));
                 }
             });
+
+    /**
+     * 传送粉块：9 个传送粉压成 1 个方块（物品形态）。
+     *
+     * <p>作为方块，它本身注册在 {@link ModBlocks} 里，这里用 {@link BlockItem}
+     * 给它一个「能拿在手里 / 放进背包 / 摆到地上」的物品形态。
+     * 稀有度 {@link Rarity#UNCOMMON}：和压缩粉同级——都是传送粉的
+     * 加工产物，比原料（普通）贵重。
+     */
+    public static final RegistryObject<Item> WARP_DUST_BLOCK = ITEMS.register(
+            "warp_dust_block",
+            () -> new BlockItem(ModBlocks.WARP_DUST_BLOCK.get(),
+                    new Item.Properties().rarity(Rarity.UNCOMMON)));
 
     public static void register(IEventBus modBus) {
         ITEMS.register(modBus);

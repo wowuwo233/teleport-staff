@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "teleport_staff:block/warp_dust_block"
+  }
+}
